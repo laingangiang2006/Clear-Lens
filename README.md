@@ -29,14 +29,14 @@ The bias engine operates entirely client-side with no external API dependencies:
 
 ### News Feed Integration
 Live headlines are fetched from three RSS feeds via the [AllOrigins](https://allorigins.win/) CORS proxy:
-- BBC News — `feeds.bbci.co.uk/news/rss.xml`
-- The Guardian — `theguardian.com/world/rss`
-- Reuters — `feeds.reuters.com/reuters/topNews`
+- BBC News: `feeds.bbci.co.uk/news/rss.xml`
+- The Guardian: `theguardian.com/world/rss`
+- Reuters: `feeds.reuters.com/reuters/topNews`
 
 Falls back gracefully to a curated static pool if feeds are unavailable.
 
 ### Authentication & Storage
-- Sign Up / Sign In with email and password (passwords stored as Base64 in `localStorage` — suitable for demo/hackathon use).
+- Sign Up / Sign In with email and password (passwords stored as Base64 in `localStorage` which is suitable for demo/hackathon use).
 - Google Sign-In simulated for demo purposes.
 - All user data, analyses, and sessions are stored in a single `Clear Lens_data` key in `localStorage`.
 - Archive supports search by title/source, filter by bias direction (Left / Center / Right), and sort by date or confidence score.
@@ -44,12 +44,12 @@ Falls back gracefully to a curated static pool if feeds are unavailable.
 ### Local Setup
 1. Clone this repository.
 2. Open `index.html` in any modern web browser.
-3. No API key or build step required — the app runs entirely in the browser.
+3. No API key or build step required, where the app runs entirely in the browser.
 
 ## Design System
 - **Typography:** Work Sans (Headlines, 700/600 weight), Inter (Body & Labels, 400/600 weight).
 - **Palette:** Deep Navy `#091426` (primary), Amber `#fe932c` (accent/secondary), Neutral Greys for surfaces.
-- **Aesthetic:** "Precision Instrument" — flat, editorial, high-contrast. No heavy shadows; depth via 1px borders and tonal layering.
+- **Aesthetic:** "Precision Instrument" which is flat, editorial, high-contrast. No heavy shadows; depth via 1px borders and tonal layering.
 - **Components:** Cards with `rounded-xl`, bias spectrum gradient bar, uppercase label-sm tracking, amber focus states on inputs.
 
 ## Pages
