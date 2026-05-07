@@ -1,7 +1,7 @@
 # Clear Lens — News Bias Detector
 
 ## Project Overview
-ClearLens is a high-fidelity media literacy tool built for **Next Byte Hacks V2**. It empowers readers to "see past the spin" by identifying political framing, loaded language, and missing perspectives in news articles through real-time URL analysis.
+Clear Lens is a high-fidelity media literacy tool built for **Next Byte Hacks V2**. It empowers readers to "see past the spin" by identifying political framing, loaded language, and missing perspectives in news articles through real-time URL analysis.
 
 ## Core Features
 - **Smart Bias Analysis Engine:** A local, research-backed analysis engine that profiles 50+ major news sources (BBC, Guardian, Reuters, Fox News, NYT, Breitbart, etc.) with pre-calibrated bias scores and credibility ratings — no API key required.
@@ -15,7 +15,7 @@ ClearLens is a high-fidelity media literacy tool built for **Next Byte Hacks V2*
 - **Per-User Data Persistence:** All analyses are saved to `localStorage` per user account. Guest analyses are stored separately. Sessions persist across page reloads.
 
 ## Technical Implementation
-ClearLens is a single-file application (`index.html`) built with **Vanilla HTML, CSS, and JavaScript**, styled with **Tailwind CSS**.
+Clear Lens is a single-file application (`index.html`) built with **Vanilla HTML, CSS, and JavaScript**, styled with **Tailwind CSS**.
 
 ### Analysis Engine
 The bias engine operates entirely client-side with no external API dependencies:
@@ -36,7 +36,7 @@ Falls back gracefully to a curated static pool if feeds are unavailable.
 ### Authentication & Storage
 - Sign Up / Sign In with email and password (passwords stored as Base64 in `localStorage` — suitable for demo/hackathon use).
 - Google Sign-In simulated for demo purposes.
-- All user data, analyses, and sessions are stored in a single `clearlens_data` key in `localStorage`.
+- All user data, analyses, and sessions are stored in a single `Clear Lens_data` key in `localStorage`.
 - Archive supports search by title/source, filter by bias direction (Left / Center / Right), and sort by date or confidence score.
 
 ### Local Setup
