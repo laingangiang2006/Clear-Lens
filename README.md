@@ -3,6 +3,8 @@
 ## Project Overview
 Clear Lens is a high-fidelity media literacy tool built for **Next Byte Hacks V2**. It empowers readers to "see past the spin" by identifying political framing, loaded language, and missing perspectives in news articles through real-time URL analysis.
 
+You can watch the demonstration [here](https://youtu.be/VE1ajG01WN0?si=wjKmWEY5bnWqusVv).
+
 ## Core Features
 - **Smart Bias Analysis Engine:** A local, research-backed analysis engine that profiles 50+ major news sources (BBC, Guardian, Reuters, Fox News, NYT, Breitbart, etc.) with pre-calibrated bias scores and credibility ratings — no API key required.
 - **Interactive Bias Spectrum:** An animated visual scale that positions an article's political lean from "Strongly Progressive" to "Strongly Conservative" with a sliding marker.
