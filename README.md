@@ -1,4 +1,4 @@
-# ClearLens — News Bias Detector
+# Clear Lens — News Bias Detector
 
 ## Project Overview
 ClearLens is a high-fidelity media literacy tool built for **Next Byte Hacks V2**. It empowers readers to "see past the spin" by identifying political framing, loaded language, and missing perspectives in news articles through real-time URL analysis.
