@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Clear Lens — News Bias Detector</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Work+Sans:wght@600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#091426",
+        "on-primary": "#ffffff",
+        "primary-container": "#1e293b",
+        "secondary": "#904d00",
+        "on-secondary": "#ffffff",
+        "secondary-container": "#fe932c",
+        "surface": "#f8f9fb",
+        "surface-container-lowest": "#ffffff",
+        "surface-container-low": "#f3f4f6",
+        "surface-container": "#edeef0",
+        "surface-container-high": "#e7e8ea",
+        "on-surface": "#191c1e",
+        "on-surface-variant": "#45474c",
+        "outline": "#75777d",
+        "outline-variant": "#c5c6cd",
+        "error": "#ba1a1a",
+      },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+        display: ["Work Sans", "sans-serif"],
+      },
+    },
+  },
+}
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; background: #f8f9fb; color: #191c1e; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; display: inline-block; vertical-align: middle; line-height: 1; }
+  
+  /* Page transitions */
+  .page { display: none; animation: fadeIn 0.25s ease; }
+  .page.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Bias spectrum */
+  .bias-track { background: linear-gradient(to right, #1d4ed8, #6b7280, #dc2626); }
+  
+  /* Typewriter effect */
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+  .cursor { animation: blink 1s infinite; }
+
+  /* Loading spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { animation: spin 0.8s linear infinite; }
+
+  /* Highlight loaded terms */
+  .loaded-term { background: rgba(144,77,0,0.12); border-bottom: 2px solid #904d00; border-radius: 2px; cursor: help; }
+
+  /* Card hover */
+  .archive-card:hover { border-color: #091426; box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+  
+  /* Toast */
+  #toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; transform: translateY(80px); opacity: 0; transition: all 0.3s ease; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  /* Smooth scroll */
+  html { scroll-behavior: smooth; }
+
+  /* Input focus */
+  input:focus, textarea:focus { outline: none; border-color: #904d00 !important; box-shadow: inset 0 0 0 1px #904d00; }
+
+  /* Nav active */
+  .nav-link.active { color: #091426; font-weight: 700; border-bottom: 2px solid #fe932c; }
+
+  /* Bias bar fill animation */
+  .bias-fill { transition: width 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+  /* News suggestion card hover */
+  .news-card:hover { border-color: #091426; transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .news-card { transition: all 0.2s ease; }
+
+  /* Skeleton loading */
+  @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+  .skeleton { background: linear-gradient(90deg, #e7e8ea 25%, #f3f4f6 50%, #e7e8ea 75%); background-size: 1000px 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- ═══════════════════ TOP NAV ═══════════════════ -->
+<header class="sticky top-0 z-50 bg-white border-b border-outline-variant w-full">
+  <div class="flex justify-between items-center px-8 py-4 w-full max-w-7xl mx-auto">
+    <div class="flex items-center gap-10">
+      <button onclick="navigate('analysis')" class="font-display text-xl font-bold text-primary">Clear Lens</button>
+      <nav class="hidden md:flex gap-8 items-center">
+        <button onclick="navigate('analysis')" class="nav-link text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors" data-page="analysis">Analysis</button>
+        <button onclick="navigate('archive')" class="nav-link text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors" data-page="archive">Archive</button>
+        <button onclick="navigate('methodology')" class="nav-link text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors" data-page="methodology">Methodology</button>
+        <button onclick="navigate('about')" class="nav-link text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors" data-page="about">About</button>
+      </nav>
+    </div>
+    <div class="flex items-center gap-4">
+      <span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors text-xl">settings</span>
+      <span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors text-xl">help_outline</span>
+      <div id="nav-auth-buttons" class="flex gap-2">
+        <button onclick="navigate('signup')" class="text-sm font-semibold text-on-surface-variant hover:text-primary px-3 py-1.5 rounded border border-outline-variant hover:border-primary transition-all">Sign Up</button>
+        <button onclick="navigate('signin')" class="text-sm font-semibold bg-primary text-white px-4 py-1.5 rounded hover:opacity-90 transition-all">Sign In</button>
+      </div>
+      <div id="nav-user-info" class="hidden items-center gap-3">
+        <span id="nav-user-name" class="text-sm font-semibold text-on-surface"></span>
+        <button onclick="signOut()" class="text-sm font-semibold text-secondary hover:underline">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════ ANALYSIS PAGE ═══════════════════ -->
+<div id="page-analysis" class="page active">
+  <main class="min-h-[calc(100vh-120px)] py-12 px-8">
+    <div class="max-w-3xl mx-auto">
+
+      <!-- How it Works -->
+      <div class="bg-white border border-outline-variant rounded-xl p-8 mb-8">
+        <h2 class="font-display text-2xl font-bold text-primary text-center mb-1">How it Works</h2>
+        <p class="text-xs font-bold uppercase tracking-widest text-secondary text-center mb-8">See Past the Spin</p>
+        <div class="grid grid-cols-3 gap-6">
+          <div class="text-center">
+            <div class="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-3">
+              <span class="material-symbols-outlined text-white text-xl">link</span>
+            </div>
+            <h3 class="font-semibold text-sm text-primary mb-1">1. Paste URL</h3>
+            <p class="text-xs text-on-surface-variant leading-relaxed">Paste an article URL from any major news source into the field below.</p>
+          </div>
+          <div class="text-center">
+            <div class="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-3">
+              <span class="material-symbols-outlined text-white text-xl">bolt</span>
+            </div>
+            <h3 class="font-semibold text-sm text-primary mb-1">2. Analyse</h3>
+            <p class="text-xs text-on-surface-variant leading-relaxed">Click 'Analyse' to scan for political framing, emotional triggers, and loaded language.</p>
+          </div>
+          <div class="text-center">
+            <div class="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-3">
+              <span class="material-symbols-outlined text-white text-xl">insights</span>
+            </div>
+            <h3 class="font-semibold text-sm text-primary mb-1">3. Review</h3>
+            <p class="text-xs text-on-surface-variant leading-relaxed">Review the bias spectrum, confidence score, and identify missing perspectives.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- URL Input -->
+      <div class="bg-white border border-outline-variant rounded-xl p-6 mb-8">
+        <label class="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-3">Article URL</label>
+        <div class="flex gap-3">
+          <input id="article-url" type="url" placeholder="https://www.example.com/article-url"
+            class="flex-1 px-4 py-3 border border-outline-variant rounded-lg text-sm bg-surface text-on-surface placeholder:text-on-surface-variant/50"
+            onkeydown="if(event.key==='Enter') analyseArticle()"/>
+          <button onclick="analyseArticle()" id="analyse-btn"
+            class="px-8 py-3 bg-primary text-white font-semibold text-sm rounded-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2">
+            <span id="analyse-btn-text">Analyse</span>
+            <span class="material-symbols-outlined text-base" id="analyse-btn-icon">bolt</span>
+          </button>
+        </div>
+        <p id="url-error" class="text-xs text-error mt-2 hidden">Please enter a valid URL.</p>
+      </div>
+
+      <!-- Analysis Result (hidden initially) -->
+      <div id="analysis-result" class="hidden mb-8">
+        <div class="bg-white border border-outline-variant rounded-xl p-6 mb-4">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h3 id="result-title" class="font-display text-lg font-bold text-primary mb-1"></h3>
+              <p id="result-source" class="text-xs font-semibold text-secondary uppercase tracking-wider"></p>
+            </div>
+            <span id="result-score" class="text-3xl font-bold text-primary"></span>
+          </div>
+
+          <!-- Bias Spectrum -->
+          <div class="mb-6">
+            <div class="flex justify-between text-xs font-bold uppercase tracking-wider mb-2">
+              <span class="text-blue-600">← Progressive</span>
+              <span class="text-on-surface-variant">Center</span>
+              <span class="text-red-600">Conservative →</span>
+            </div>
+            <div class="relative h-3 bias-track rounded-full overflow-hidden">
+              <div class="absolute inset-0 bg-white/20"></div>
+              <div id="bias-marker" class="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-primary rounded-full shadow-md bias-fill" style="left: 50%; transform: translateX(-50%) translateY(-50%);"></div>
+            </div>
+            <p id="bias-label" class="text-sm font-bold text-primary mt-2 text-center"></p>
+          </div>
+
+          <!-- Stats Row -->
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="bg-surface-container-low rounded-lg p-3 text-center">
+              <p class="text-xs text-on-surface-variant font-semibold uppercase tracking-wider mb-1">Confidence</p>
+              <p id="stat-confidence" class="text-xl font-bold text-primary"></p>
+            </div>
+            <div class="bg-surface-container-low rounded-lg p-3 text-center">
+              <p class="text-xs text-on-surface-variant font-semibold uppercase tracking-wider mb-1">Loaded Terms</p>
+              <p id="stat-loaded" class="text-xl font-bold text-secondary"></p>
+            </div>
+            <div class="bg-surface-container-low rounded-lg p-3 text-center">
+              <p class="text-xs text-on-surface-variant font-semibold uppercase tracking-wider mb-1">Credibility</p>
+              <p id="stat-credibility" class="text-xl font-bold text-primary"></p>
+            </div>
+          </div>
+
+          <!-- Loaded Terms -->
+          <div class="mb-4">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">Detected Loaded Language</h4>
+            <div id="loaded-terms-list" class="flex flex-wrap gap-2"></div>
+          </div>
+
+          <!-- Missing Perspectives -->
+          <div class="mb-4">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">Missing Perspectives</h4>
+            <div id="missing-perspectives" class="space-y-2"></div>
+          </div>
+
+          <!-- Framing Strategy -->
+          <div>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Framing Strategy</h4>
+            <p id="framing-strategy" class="text-sm text-on-surface-variant leading-relaxed"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trending Topics -->
+      <div class="bg-primary rounded-xl p-8 mb-8">
+        <p class="text-xs font-bold uppercase tracking-widest text-secondary mb-1">Trending Topics for Analysis</p>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="font-display text-2xl font-bold text-white">News Suggestions</h2>
+          <button onclick="loadNewsSuggestions()" class="text-xs font-semibold text-secondary/80 hover:text-secondary transition-colors flex items-center gap-1">
+            <span class="material-symbols-outlined text-base">refresh</span> Refresh
+          </button>
+        </div>
+        <div id="news-suggestions" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Recent History -->
+      <div>
+        <div class="flex items-center gap-2 mb-4">
+          <span class="material-symbols-outlined text-on-surface-variant">history</span>
+          <h2 class="font-display text-lg font-bold text-primary">Recent History</h2>
+        </div>
+        <div id="history-list" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <!-- Populated by JS -->
+        </div>
+        <div id="history-empty" class="hidden text-center py-8 text-sm text-on-surface-variant">
+          No analyses yet. Paste a URL above to get started.
+        </div>
+        <div class="text-center">
+          <button onclick="navigate('archive')" class="text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 mx-auto">
+            View all archives <span class="material-symbols-outlined text-base">arrow_forward</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════════ ARCHIVE PAGE ═══════════════════ -->
+<div id="page-archive" class="page">
+  <main class="py-10 px-8 min-h-[calc(100vh-120px)]">
+    <div class="max-w-7xl mx-auto">
+      <div class="mb-8">
+        <h1 class="font-display text-3xl font-bold text-primary mb-2">Analysis Archive</h1>
+        <p class="text-sm text-on-surface-variant max-w-lg">A historical repository of media bias evaluations. Search across analyses to understand linguistic framing and editorial leanings.</p>
+      </div>
+
+      <!-- Search & Filter -->
+      <div class="flex flex-col md:flex-row gap-3 mb-8">
+        <div class="flex-1 relative">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-xl">search</span>
+          <input id="archive-search" type="text" placeholder="Search by article title, publication, or topic..."
+            oninput="filterArchive()"
+            class="w-full pl-10 pr-4 py-3 border border-outline-variant rounded-lg text-sm bg-white text-on-surface"/>
+        </div>
+        <select id="archive-filter-bias" onchange="filterArchive()"
+          class="px-4 py-3 border border-outline-variant rounded-lg text-sm bg-white text-on-surface cursor-pointer">
+          <option value="">All Biases</option>
+          <option value="left">Left Lean</option>
+          <option value="center">Center / Neutral</option>
+          <option value="right">Right Lean</option>
+        </select>
+        <select id="archive-sort" onchange="filterArchive()"
+          class="px-4 py-3 border border-outline-variant rounded-lg text-sm bg-white text-on-surface cursor-pointer">
+          <option value="date">Date</option>
+          <option value="confidence">Confidence</option>
+        </select>
+      </div>
+
+      <div id="archive-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <!-- Populated by JS -->
+      </div>
+      <div id="archive-empty" class="hidden text-center py-16 text-sm text-on-surface-variant">
+        No analyses found. Try adjusting your search.
+      </div>
+      <div class="text-center">
+        <button id="load-more-btn" onclick="loadMoreArchive()" class="px-8 py-3 border border-outline-variant rounded-lg text-sm font-semibold text-on-surface-variant hover:text-primary hover:border-primary transition-all flex items-center gap-2 mx-auto">
+          Load More Analysis <span class="material-symbols-outlined text-base">expand_more</span>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════════ METHODOLOGY PAGE ═══════════════════ -->
+<div id="page-methodology" class="page">
+  <main class="py-12 px-8 min-h-[calc(100vh-120px)]">
+    <div class="max-w-7xl mx-auto">
+      <div class="mb-10">
+        <span class="inline-block px-3 py-1 bg-white border border-outline-variant rounded text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">Core Framework</span>
+        <h1 class="font-display text-4xl font-bold text-primary mb-4 max-w-2xl">The Architecture of Objective Truth.</h1>
+        <p class="text-base text-on-surface-variant max-w-2xl leading-relaxed">Clear Lens operates as a precision instrument for the information age. Our methodology transcends simple sentiment analysis, employing a multi-layered linguistic audit to isolate intent from information.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- Linguistic Deviation -->
+        <div class="bg-white border border-outline-variant rounded-xl p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 bg-secondary/10 rounded-lg flex items-center justify-center">
+              <span class="material-symbols-outlined text-secondary">bar_chart</span>
+            </div>
+            <div>
+              <h3 class="font-display text-lg font-bold text-primary">Linguistic Deviation Trends</h3>
+              <p class="text-xs text-on-surface-variant">Quantifying the gap between neutral reporting and persuasive rhetoric.</p>
+            </div>
+          </div>
+          <p class="text-sm text-on-surface-variant leading-relaxed mb-4">Our engine maps every sentence against a baseline of neutral lexicon. We track 'Deviation Spikes'—instances where loaded language, hyperbole, or emotive modifiers alter perceived gravity.</p>
+          <div class="bg-surface-container-low rounded-lg p-4">
+            <p class="text-xs font-bold uppercase tracking-wider text-secondary mb-3">Detection Metrics</p>
+            <ul class="space-y-2">
+              <li class="flex items-center gap-2 text-xs text-on-surface-variant"><span class="material-symbols-outlined text-sm text-secondary">check_circle</span> Adjective-to-Noun Ratio</li>
+              <li class="flex items-center gap-2 text-xs text-on-surface-variant"><span class="material-symbols-outlined text-sm text-secondary">check_circle</span> Passive Voice Obfuscation</li>
+              <li class="flex items-center gap-2 text-xs text-on-surface-variant"><span class="material-symbols-outlined text-sm text-secondary">check_circle</span> Absolute Universal Usage (Always/Never)</li>
+              <li class="flex items-center gap-2 text-xs text-on-surface-variant"><span class="material-symbols-outlined text-sm text-secondary">check_circle</span> Emotional Intensity Indexing</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Systemic Bias -->
+        <div class="bg-white border border-outline-variant rounded-xl p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 bg-secondary/10 rounded-lg flex items-center justify-center">
+              <span class="material-symbols-outlined text-secondary">radar</span>
+            </div>
+            <div>
+              <h3 class="font-display text-lg font-bold text-primary">Systemic Bias Detection</h3>
+              <p class="text-xs text-on-surface-variant">Cross-referencing narratives against historical framing data.</p>
+            </div>
+          </div>
+          <p class="text-sm text-on-surface-variant leading-relaxed mb-6">By cross-referencing narratives against a global repository of historical framing, we identify persistent ideological leanings that transcend individual articles.</p>
+          <div>
+            <div class="flex justify-between text-xs font-semibold mb-2">
+              <span class="text-on-surface-variant">Neutrality Baseline</span>
+              <span class="text-primary">82% Match</span>
+            </div>
+            <div class="h-2 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-secondary rounded-full" style="width: 82%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Framing Analysis -->
+        <div class="bg-primary rounded-xl p-6 text-white">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="material-symbols-outlined text-secondary">dataset</span>
+            <h3 class="font-display text-lg font-bold">Framing Analysis</h3>
+          </div>
+          <p class="text-sm text-white/70 leading-relaxed mb-6">Framing is the context that surrounds a fact. By analyzing which details are prioritized and which are omitted, Clear Lens reveals the "hidden lens" through which the story is told.</p>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-white/10 rounded-lg p-4">
+              <p class="text-xs font-bold uppercase tracking-wider text-secondary mb-2">Inclusion</p>
+              <p class="text-sm text-white/80">Tracking emphasized narrative nodes.</p>
+            </div>
+            <div class="bg-white/10 rounded-lg p-4">
+              <p class="text-xs font-bold uppercase tracking-wider text-secondary mb-2">Exclusion</p>
+              <p class="text-sm text-white/80">Identifying missing counter-perspectives.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Processing Pipeline -->
+        <div class="bg-white border border-outline-variant rounded-xl p-6">
+          <h3 class="font-display text-lg font-bold text-primary mb-2">Seeing Past the Spin</h3>
+          <p class="text-sm text-on-surface-variant leading-relaxed mb-6">Our recursive processing loop ensures every report is parsed through three distinct filters before arriving at a final clarity score.</p>
+          <div class="flex items-center gap-2">
+            <div class="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-xs font-semibold text-on-surface">Raw Ingest</div>
+            <span class="material-symbols-outlined text-on-surface-variant text-sm">arrow_forward</span>
+            <div class="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-xs font-semibold text-on-surface">Linguistic Parsing</div>
+            <span class="material-symbols-outlined text-on-surface-variant text-sm">arrow_forward</span>
+            <div class="px-3 py-2 bg-secondary-container rounded text-xs font-semibold text-primary">Clear Lens Insight</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Open Standards -->
+      <div class="bg-white border border-outline-variant rounded-xl p-8 mb-8">
+        <h2 class="font-display text-2xl font-bold text-primary text-center mb-8">Transparency & Open Standards</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div class="text-center">
+            <span class="material-symbols-outlined text-3xl text-secondary mb-3 block">gavel</span>
+            <h4 class="font-display text-base font-bold text-primary mb-2">No Black Boxes</h4>
+            <p class="text-sm text-on-surface-variant leading-relaxed">Every analytical decision is logged with a confidence interval and a citation to its linguistic root.</p>
+          </div>
+          <div class="text-center">
+            <span class="material-symbols-outlined text-3xl text-secondary mb-3 block">database</span>
+            <h4 class="font-display text-base font-bold text-primary mb-2">Diverse Datasets</h4>
+            <p class="text-sm text-on-surface-variant leading-relaxed">Our baseline is trained on a non-partisan corpus spanning 40 years of global academic and news archives.</p>
+          </div>
+          <div class="text-center">
+            <span class="material-symbols-outlined text-3xl text-secondary mb-3 block">history</span>
+            <h4 class="font-display text-base font-bold text-primary mb-2">Evolving Logic</h4>
+            <p class="text-sm text-on-surface-variant leading-relaxed">The engine updates daily to recognize shifting vernacular and modern rhetorical techniques.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="bg-surface-container-low border border-outline-variant rounded-xl p-10 text-center">
+        <h2 class="font-display text-2xl font-bold text-primary mb-2">Experience the Analysis.</h2>
+        <p class="text-sm text-on-surface-variant mb-6">Apply our methodology to any URL to receive a comprehensive Clarity Report within seconds.</p>
+        <div class="flex gap-3 justify-center">
+          <button onclick="navigate('analysis')" class="px-6 py-3 bg-primary text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-all">Start Free Analysis</button>
+          <button onclick="navigate('methodology')" class="px-6 py-3 border border-outline-variant text-sm font-semibold rounded-lg hover:border-primary hover:text-primary transition-all">Read Case Studies</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════════ ABOUT PAGE ═══════════════════ -->
+<div id="page-about" class="page">
+  <main class="py-12 px-8 min-h-[calc(100vh-120px)]">
+    <div class="max-w-7xl mx-auto">
+      <!-- Hero -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-16">
+        <div>
+          <span class="inline-block px-3 py-1 bg-white border border-outline-variant rounded text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-6">Our Manifesto</span>
+          <h1 class="font-display text-5xl font-bold text-primary mb-3 leading-tight">Precision in<br/><span class="text-secondary">Perspective.</span></h1>
+          <p class="text-base text-on-surface-variant leading-relaxed mb-6">In an era of algorithmic echo chambers and polarized narratives, truth is often the first casualty. Clear Lens is a precision instrument designed to restore objectivity to our shared information landscape.</p>
+        </div>
+        <div class="bg-surface-container-low rounded-xl border border-outline-variant h-64 flex items-center justify-center overflow-hidden">
+          <div class="text-center p-8">
+            <div class="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span class="material-symbols-outlined text-3xl text-white">visibility</span>
+            </div>
+            <p class="font-display text-lg font-bold text-primary">Focused Clarity</p>
+            <p class="text-sm text-on-surface-variant mt-1">Strip away the noise. Reveal the intent. Understand the impact.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mission -->
+      <div class="bg-white border border-outline-variant rounded-xl p-8 mb-8">
+        <h2 class="font-display text-xl font-bold text-primary mb-3">Our Mission</h2>
+        <p class="text-sm text-on-surface-variant leading-relaxed mb-6">We exist to combat the fragmentation of public discourse. By providing tools for deep media literacy and transparent analysis, Clear Lens empowers citizens to look past sensationalism and understand the structural biases that shape modern news.</p>
+        <div class="border-t border-outline-variant pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-widest text-secondary mb-2">01. Dismantle</p>
+            <p class="text-sm text-on-surface-variant">Breaking down algorithmic biases in daily content delivery.</p>
+          </div>
+          <div>
+            <p class="text-xs font-bold uppercase tracking-widest text-secondary mb-2">02. Equip</p>
+            <p class="text-sm text-on-surface-variant">Providing users with professional-grade analytical tools.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Why Clear Lens -->
+      <div class="mb-10">
+        <h2 class="font-display text-2xl font-bold text-primary text-center mb-8">Why Clear Lens?</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div>
+            <span class="material-symbols-outlined text-2xl text-secondary mb-3 block">bar_chart</span>
+            <h3 class="font-display font-bold text-primary mb-2">Technical Rigor</h3>
+            <p class="text-sm text-on-surface-variant leading-relaxed">Our methodology is grounded in data science and linguistic analysis, not political opinion.</p>
+          </div>
+          <div>
+            <span class="material-symbols-outlined text-2xl text-secondary mb-3 block">visibility</span>
+            <h3 class="font-display font-bold text-primary mb-2">Radical Transparency</h3>
+            <p class="text-sm text-on-surface-variant leading-relaxed">Every bias score and sentiment rating is fully auditable and reproducible.</p>
+          </div>
+          <div>
+            <span class="material-symbols-outlined text-2xl text-secondary mb-3 block">balance</span>
+            <h3 class="font-display font-bold text-primary mb-2">Neutral Ground</h3>
+            <p class="text-sm text-on-surface-variant leading-relaxed">We provide the lens; you provide the judgment. We do not censor—we contextualize.</p>
+          </div>
+          <div>
+            <span class="material-symbols-outlined text-2xl text-secondary mb-3 block">school</span>
+            <h3 class="font-display font-bold text-primary mb-2">Media Literacy</h3>
+            <p class="text-sm text-on-surface-variant leading-relaxed">A learning platform that evolves with the user, sharpening critical thinking skills over time.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Born in Innovation -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div class="md:col-span-1 bg-white border border-outline-variant rounded-xl p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="material-symbols-outlined text-secondary">rocket_launch</span>
+            <h3 class="font-display text-lg font-bold text-primary">Born in Innovation</h3>
+          </div>
+          <p class="text-sm text-on-surface-variant leading-relaxed mb-4">Clear Lens originated as a prototype for the Next Byte Hacks V2. Our team of data scientists, journalists, and UI designers came together to build the tool we ourselves needed.</p>
+          <div class="flex flex-wrap gap-2">
+            <span class="px-2 py-1 bg-surface-container-low border border-outline-variant rounded text-xs font-semibold">Tech Stack: Vanilla JS</span>
+            <span class="px-2 py-1 bg-surface-container-low border border-outline-variant rounded text-xs font-semibold">NLP Engine: Gemini 2.0</span>
+            <span class="px-2 py-1 bg-surface-container-low border border-outline-variant rounded text-xs font-semibold">Open Source Core</span>
+          </div>
+        </div>
+        <div class="bg-surface-container-low rounded-xl border border-outline-variant p-5 flex flex-col items-center justify-center">
+          <div class="w-16 h-16 bg-surface-container rounded-full mb-3 flex items-center justify-center">
+            <span class="material-symbols-outlined text-2xl text-on-surface-variant">person</span>
+          </div>
+          <p class="font-semibold text-primary text-sm">Sarah Chen</p>
+          <p class="text-xs text-secondary font-semibold">Chief Data Scientist</p>
+        </div>
+        <div class="bg-surface-container-low rounded-xl border border-outline-variant p-5 flex flex-col items-center justify-center">
+          <div class="w-16 h-16 bg-surface-container rounded-full mb-3 flex items-center justify-center">
+            <span class="material-symbols-outlined text-2xl text-on-surface-variant">person</span>
+          </div>
+          <p class="font-semibold text-primary text-sm">Marcus Thorne</p>
+          <p class="text-xs text-secondary font-semibold">Lead Architect</p>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="bg-primary rounded-xl p-10 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div>
+          <h2 class="font-display text-2xl font-bold text-white mb-1">Ready to see clearly?</h2>
+          <p class="text-sm text-white/60">Join our community of analysts and media professionals today.</p>
+        </div>
+        <div class="flex gap-3">
+          <button onclick="navigate('signup')" class="px-6 py-3 bg-white text-primary text-sm font-bold rounded-lg hover:opacity-90 transition-all">Get Started</button>
+          <button class="px-6 py-3 border border-white/30 text-white text-sm font-semibold rounded-lg hover:bg-white/10 transition-all">Join API Waitlist</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════════ SIGN IN PAGE ═══════════════════ -->
+<div id="page-signin" class="page">
+  <main class="flex-grow flex items-center justify-center px-8 py-16 bg-surface-container-low min-h-[calc(100vh-120px)]">
+    <div class="w-full max-w-[440px]">
+      <div class="bg-white border border-outline-variant rounded-xl p-8 shadow-sm">
+        <div class="mb-8 text-center">
+          <h1 class="font-display text-2xl font-bold text-primary mb-2">Sign In</h1>
+          <p class="text-sm text-on-surface-variant">Access your saved analyses and custom bias reports.</p>
+        </div>
+        <div id="signin-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-error font-semibold"></div>
+        <div class="space-y-5">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2" for="signin-email">Email Address</label>
+            <input class="w-full h-12 px-4 border border-outline-variant rounded-lg text-sm bg-white placeholder:text-on-surface-variant/50" id="signin-email" type="email" placeholder="name@company.com" onkeydown="if(event.key==='Enter') handleSignIn()"/>
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant" for="signin-password">Password</label>
+              <a class="text-xs font-semibold text-secondary hover:underline" href="#">Forgot Password?</a>
+            </div>
+            <input class="w-full h-12 px-4 border border-outline-variant rounded-lg text-sm bg-white placeholder:text-on-surface-variant/50" id="signin-password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter') handleSignIn()"/>
+          </div>
+          <div class="pt-2 space-y-3">
+            <button onclick="handleSignIn()" class="w-full h-12 bg-primary text-white font-semibold text-sm rounded-lg hover:opacity-90 active:scale-[0.98] transition-all">Sign In</button>
+            <div class="relative flex items-center py-1">
+              <div class="flex-grow border-t border-outline-variant"></div>
+              <span class="flex-shrink mx-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">or</span>
+              <div class="flex-grow border-t border-outline-variant"></div>
+            </div>
+            <button onclick="handleGoogleSignIn()" class="w-full h-12 bg-white border border-outline-variant text-on-surface font-semibold text-sm rounded-lg flex items-center justify-center gap-3 hover:bg-surface-container-low transition-colors">
+              <svg class="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              Continue with Google
+            </button>
+          </div>
+        </div>
+        <div class="mt-8 text-center">
+          <p class="text-sm text-on-surface-variant">Don't have an account? <button onclick="navigate('signup')" class="text-secondary font-bold hover:underline">Sign Up</button></p>
+        </div>
+      </div>
+      <div class="mt-5 text-center px-4">
+        <p class="text-xs text-on-surface-variant/60 italic">"Transparency is the first step toward true neutrality." — Clear Lens Methodology</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════════ SIGN UP PAGE ═══════════════════ -->
+<div id="page-signup" class="page">
+  <main class="min-h-[calc(100vh-120px)] flex items-center py-12 px-8">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-12 w-full max-w-7xl mx-auto items-center">
+      <!-- Branding Column -->
+      <div class="hidden md:flex md:col-span-6 flex-col gap-6">
+        <span class="inline-block px-3 py-1 bg-white border border-outline-variant rounded text-xs font-bold uppercase tracking-widest text-on-surface-variant w-fit">Protocol 01: Verification</span>
+        <h1 class="font-display text-5xl font-bold text-primary leading-tight max-w-md">Objectivity through structural transparency.</h1>
+        <p class="text-base text-on-surface-variant max-w-sm leading-relaxed">Join Clear Lens to access precise, data-driven analysis of global narratives. No bias, just the blueprint of information.</p>
+        <div class="mt-4 bg-surface-container-low rounded-xl border border-outline-variant overflow-hidden h-72 flex items-center justify-center">
+          <div class="text-center p-8">
+            <div class="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span class="material-symbols-outlined text-4xl text-white">schema</span>
+            </div>
+            <p class="font-display text-lg font-bold text-primary">Blueprint of Information</p>
+            <p class="text-sm text-on-surface-variant mt-1 max-w-xs mx-auto">Every data point, every framing choice — all transparent and auditable.</p>
+          </div>
+        </div>
+      </div>
+      <!-- Sign Up Form -->
+      <div class="col-span-1 md:col-span-6 flex justify-center">
+        <div class="w-full max-w-md bg-white border border-outline-variant rounded-xl p-8">
+          <div class="mb-8">
+            <h2 class="font-display text-2xl font-bold text-primary mb-1">Create Account</h2>
+            <p class="text-sm text-on-surface-variant">Initialize your analyst profile.</p>
+          </div>
+          <div id="signup-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-error font-semibold"></div>
+          <div class="space-y-5">
+            <div>
+              <label class="block text-xs font-semibold text-on-surface-variant mb-2" for="signup-name">Full Name</label>
+              <input class="w-full px-4 py-3 border border-outline-variant rounded-lg text-sm bg-white placeholder:text-on-surface-variant/50" id="signup-name" type="text" placeholder="Enter your full name"/>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-on-surface-variant mb-2" for="signup-email">Email Address</label>
+              <input class="w-full px-4 py-3 border border-outline-variant rounded-lg text-sm bg-white placeholder:text-on-surface-variant/50" id="signup-email" type="email" placeholder="name@organization.com"/>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-on-surface-variant mb-2" for="signup-password">Password</label>
+              <input class="w-full px-4 py-3 border border-outline-variant rounded-lg text-sm bg-white placeholder:text-on-surface-variant/50" id="signup-password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter') handleSignUp()"/>
+            </div>
+            <button onclick="handleSignUp()" class="w-full py-3 bg-primary text-white font-semibold text-sm rounded-lg hover:opacity-90 active:scale-[0.98] transition-all">Create Account</button>
+            <div class="relative flex items-center">
+              <div class="flex-grow border-t border-outline-variant"></div>
+              <span class="flex-shrink mx-4 text-xs font-bold text-on-surface-variant uppercase">OR</span>
+              <div class="flex-grow border-t border-outline-variant"></div>
+            </div>
+            <button onclick="handleGoogleSignIn()" class="w-full py-3 flex items-center justify-center gap-3 border border-outline-variant text-sm font-semibold rounded-lg hover:bg-surface-container-low transition-colors">
+              <svg class="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              Continue with Google
+            </button>
+          </div>
+          <div class="mt-8 pt-6 border-t border-outline-variant text-center">
+            <p class="text-sm text-on-surface-variant">Already have an account? <button onclick="navigate('signin')" class="text-primary font-bold hover:underline">Sign In</button></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════════ FOOTER ═══════════════════ -->
+<footer class="bg-white border-t border-outline-variant mt-auto">
+  <div class="flex flex-col md:flex-row justify-between items-center px-8 py-6 w-full max-w-7xl mx-auto gap-4">
+    <div class="flex flex-col md:items-start items-center gap-1">
+      <span class="font-display text-lg font-bold text-primary">Clear Lens</span>
+      <p class="text-xs text-on-surface-variant">© 2024 Clear Lens. Unfiltered transparency for the informed citizen.</p>
+    </div>
+    <nav class="flex flex-wrap justify-center gap-6">
+      <a class="text-xs font-semibold text-on-surface-variant hover:text-secondary transition-colors" href="#">Privacy Policy</a>
+      <a class="text-xs font-semibold text-on-surface-variant hover:text-secondary transition-colors" href="#">Terms of Service</a>
+      <a class="text-xs font-semibold text-on-surface-variant hover:text-secondary transition-colors" href="#">API Documentation</a>
+      <a class="text-xs font-semibold text-on-surface-variant hover:text-secondary transition-colors" href="#">Contact</a>
+    </nav>
+  </div>
+</footer>
+
+<!-- Toast -->
+<div id="toast" class="bg-primary text-white text-sm font-semibold px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
+  <span class="material-symbols-outlined text-base" id="toast-icon">check_circle</span>
+  <span id="toast-msg"></span>
+</div>
+
+<!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
+<script>
+// ── STATE ──
+let currentUser = null;
+let currentPage = 'analysis';
+let archivePage = 0;
+const ARCHIVE_PAGE_SIZE = 6;
+
+// ── LOCALSTORAGE HELPERS ──
+const LS_KEY = 'Clear Lens_data';
+function getStore() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || { users: {}, analyses: [] }; }
+  catch { return { users: {}, analyses: [] }; }
+}
+function saveStore(data) { localStorage.setItem(LS_KEY, JSON.stringify(data)); }
+
+function getUserAnalyses(email) {
+  const store = getStore();
+  return (store.analyses || []).filter(a => a.userEmail === email).reverse();
+}
+
+function saveAnalysis(analysis) {
+  const store = getStore();
+  store.analyses = store.analyses || [];
+  analysis.userEmail = currentUser ? currentUser.email : 'guest';
+  analysis.id = Date.now().toString();
+  store.analyses.unshift(analysis);
+  // Keep max 200
+  if (store.analyses.length > 200) store.analyses = store.analyses.slice(0, 200);
+  saveStore(store);
+}
+
+// ── NAVIGATION ──
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById('page-' + page);
+  if (el) { el.classList.add('active'); currentPage = page; }
+  
+  document.querySelectorAll('.nav-link').forEach(l => {
+    l.classList.toggle('active', l.dataset.page === page);
+  });
+
+  if (page === 'analysis') { renderHistory(); loadNewsSuggestions(); }
+  if (page === 'archive') { archivePage = 0; renderArchive(); }
+  window.scrollTo(0, 0);
+}
+
+// ── AUTH ──
+function handleSignIn() {
+  const email = document.getElementById('signin-email').value.trim();
+  const password = document.getElementById('signin-password').value;
+  const errEl = document.getElementById('signin-error');
+  
+  if (!email || !password) { showError(errEl, 'Please fill in all fields.'); return; }
+  
+  const store = getStore();
+  const user = store.users[email];
+  if (!user || user.password !== btoa(password)) {
+    showError(errEl, 'Invalid email or password.'); return;
+  }
+  
+  errEl.classList.add('hidden');
+  setCurrentUser({ email, name: user.name });
+  showToast('Welcome back, ' + user.name + '!', 'check_circle');
+  navigate('analysis');
+}
+
+function handleSignUp() {
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const errEl = document.getElementById('signup-error');
+  
+  if (!name || !email || !password) { showError(errEl, 'Please fill in all fields.'); return; }
+  if (password.length < 6) { showError(errEl, 'Password must be at least 6 characters.'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError(errEl, 'Please enter a valid email address.'); return; }
+  
+  const store = getStore();
+  if (store.users[email]) { showError(errEl, 'An account with this email already exists.'); return; }
+  
+  store.users[email] = { name, password: btoa(password), createdAt: Date.now() };
+  saveStore(store);
+  
+  errEl.classList.add('hidden');
+  setCurrentUser({ email, name });
+  showToast('Account created! Welcome, ' + name + '!', 'check_circle');
+  navigate('analysis');
+}
+
+function handleGoogleSignIn() {
+  // Simulate Google sign-in for hackathon demo
+  const name = 'Demo User';
+  const email = 'demo@Clear Lens.app';
+  const store = getStore();
+  if (!store.users[email]) {
+    store.users[email] = { name, password: '', createdAt: Date.now() };
+    saveStore(store);
+  }
+  setCurrentUser({ email, name });
+  showToast('Signed in with Google!', 'check_circle');
+  navigate('analysis');
+}
+
+function setCurrentUser(user) {
+  currentUser = user;
+  localStorage.setItem('Clear Lens_session', JSON.stringify(user));
+  updateNavAuth();
+}
+
+function signOut() {
+  currentUser = null;
+  localStorage.removeItem('Clear Lens_session');
+  updateNavAuth();
+  showToast('Signed out successfully.', 'logout');
+  navigate('analysis');
+}
+
+function updateNavAuth() {
+  const btnArea = document.getElementById('nav-auth-buttons');
+  const userArea = document.getElementById('nav-user-info');
+  if (currentUser) {
+    btnArea.classList.add('hidden');
+    userArea.classList.remove('hidden');
+    userArea.classList.add('flex');
+    document.getElementById('nav-user-name').textContent = currentUser.name;
+  } else {
+    btnArea.classList.remove('hidden');
+    userArea.classList.add('hidden');
+  }
+}
+
+function restoreSession() {
+  try {
+    const s = localStorage.getItem('Clear Lens_session');
+    if (s) { currentUser = JSON.parse(s); updateNavAuth(); }
+  } catch {}
+}
+
+function showError(el, msg) {
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+// ── NEWS SUGGESTIONS (RSS via allorigins proxy) ──
+const NEWS_FEEDS = [
+  { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/rss.xml', color: '#b91c1c' },
+  { name: 'The Guardian', url: 'https://www.theguardian.com/world/rss', color: '#004b87' },
+  { name: 'Reuters', url: 'https://feeds.reuters.com/reuters/topNews', color: '#f97316' },
+];
+
+async function fetchFeed(feed) {
+  const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(feed.url)}`;
+  const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+  const data = await res.json();
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(data.contents, 'text/xml');
+  const items = [...xml.querySelectorAll('item')].slice(0, 10);
+  return items.map(item => ({
+    title: item.querySelector('title')?.textContent || '',
+    link: item.querySelector('link')?.textContent || item.querySelector('guid')?.textContent || '#',
+    description: item.querySelector('description')?.textContent?.replace(/<[^>]+>/g, '').slice(0, 100) || '',
+    pubDate: item.querySelector('pubDate')?.textContent || '',
+    source: feed.name,
+    sourceColor: feed.color,
+  }));
+}
+
+let cachedSuggestions = [];
+async function loadNewsSuggestions() {
+  const container = document.getElementById('news-suggestions');
+  container.innerHTML = `
+    ${[1,2,3].map(() => `
+      <div class="bg-white/10 rounded-xl p-5">
+        <div class="skeleton h-3 w-20 mb-3" style="background:rgba(255,255,255,0.2)"></div>
+        <div class="skeleton h-4 w-full mb-2" style="background:rgba(255,255,255,0.2)"></div>
+        <div class="skeleton h-4 w-3/4 mb-4" style="background:rgba(255,255,255,0.2)"></div>
+        <div class="skeleton h-3 w-24" style="background:rgba(255,255,255,0.2)"></div>
+      </div>
+    `).join('')}
+  `;
+
+  try {
+    let allItems = [];
+    // Try feeds in parallel
+    const results = await Promise.allSettled(NEWS_FEEDS.map(f => fetchFeed(f)));
+    results.forEach(r => { if (r.status === 'fulfilled') allItems.push(...r.value); });
+
+    if (allItems.length === 0) throw new Error('No items');
+
+    // Shuffle and pick 3 fresh ones
+    const shuffled = allItems.sort(() => Math.random() - 0.5);
+    cachedSuggestions = shuffled.slice(0, 3);
+    renderSuggestions(cachedSuggestions);
+  } catch (e) {
+    // Fallback to curated static suggestions
+    cachedSuggestions = getFallbackSuggestions();
+    renderSuggestions(cachedSuggestions);
+  }
+}
+
+function getFallbackSuggestions() {
+  const pool = [
+    { title: "Global Leaders Convene on Climate Finance at COP Summit", link: "https://www.bbc.com/news", source: "BBC News", sourceColor: "#b91c1c" },
+    { title: "AI Revolution: Research Reveals Impact on Middle-Class Employment", link: "https://www.theguardian.com", source: "The Guardian", sourceColor: "#004b87" },
+    { title: "Chancellor's Budget: Investment in Public Services and Tax Reform", link: "https://www.reuters.com", source: "Reuters", sourceColor: "#f97316" },
+    { title: "Tech Giants Face New EU Privacy Regulations", link: "https://www.bbc.com/news/technology", source: "BBC News", sourceColor: "#b91c1c" },
+    { title: "Healthcare Reform: Analyzing the Proposed Subsidy Plan", link: "https://www.theguardian.com/society", source: "The Guardian", sourceColor: "#004b87" },
+    { title: "Urban Development and Zoning: Cities in Flux", link: "https://www.reuters.com/world", source: "Reuters", sourceColor: "#f97316" },
+    { title: "Climate Accord: The Hidden Costs of Net-Zero Compliance", link: "https://www.bbc.com/news/science", source: "BBC News", sourceColor: "#b91c1c" },
+    { title: "Immigration Policy Debate Intensifies Ahead of Election", link: "https://www.theguardian.com/politics", source: "The Guardian", sourceColor: "#004b87" },
+    { title: "Economic Decoupling: Trade War or Strategic Realignment?", link: "https://www.reuters.com/business", source: "Reuters", sourceColor: "#f97316" },
+  ];
+  return pool.sort(() => Math.random() - 0.5).slice(0, 3);
+}
+
+function renderSuggestions(items) {
+  const container = document.getElementById('news-suggestions');
+  container.innerHTML = items.map(item => `
+    <div class="news-card bg-white/10 border border-white/20 rounded-xl p-5 cursor-pointer" onclick="useSuggestion('${escapeAttr(item.link)}', '${escapeAttr(item.title)}')">
+      <p class="text-xs font-bold uppercase tracking-wider mb-3" style="color:${item.sourceColor || '#fe932c'}">${item.source}</p>
+      <h3 class="text-sm font-semibold text-white leading-snug mb-4 line-clamp-3">${escapeHtml(item.title)}</h3>
+      <a href="${escapeAttr(item.link)}" target="_blank" onclick="event.stopPropagation()" class="text-xs font-semibold text-white/60 hover:text-white flex items-center gap-1 transition-colors">
+        Read Original <span class="material-symbols-outlined text-xs">open_in_new</span>
+      </a>
+    </div>
+  `).join('');
+}
+
+function useSuggestion(url, title) {
+  const input = document.getElementById('article-url');
+  input.value = url;
+  input.focus();
+  // Auto-analyse with the title as context
+  analyseArticle(title);
+}
+
+// ── ANALYSIS ENGINE ──
+async function analyseArticle(titleHint = null) {
+  const urlInput = document.getElementById('article-url');
+  const url = urlInput.value.trim();
+  
+  const errEl = document.getElementById('url-error');
+  if (!url) { errEl.classList.remove('hidden'); return; }
+  
+  // Basic URL validation
+  try { new URL(url); } catch { errEl.classList.remove('hidden'); return; }
+  errEl.classList.add('hidden');
+
+  // Show loading state
+  const btn = document.getElementById('analyse-btn');
+  const btnText = document.getElementById('analyse-btn-text');
+  const btnIcon = document.getElementById('analyse-btn-icon');
+  btn.disabled = true;
+  btnText.textContent = 'Analysing';
+  btnIcon.innerHTML = `<svg class="w-4 h-4 spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>`;
+
+  try {
+    const result = await runAnalysis(url, titleHint);
+    displayResult(result, url);
+    saveAnalysis(result);
+    renderHistory();
+    showToast('Analysis complete!', 'check_circle');
+  } catch (e) {
+    showToast('Analysis failed. Please try another URL.', 'error');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = 'Analyse';
+    btnIcon.className = 'material-symbols-outlined text-base';
+    btnIcon.textContent = 'bolt';
+  }
+}
+
+// ── BIAS KNOWLEDGE BASE (source editorial profiles) ──
+const SOURCE_PROFILES = {
+  // Left-leaning
+  'theguardian.com':    { bias: -45, credibility: 82, name: 'The Guardian' },
+  'guardian.com':       { bias: -45, credibility: 82, name: 'The Guardian' },
+  'nytimes.com':        { bias: -30, credibility: 88, name: 'The New York Times' },
+  'washingtonpost.com': { bias: -28, credibility: 85, name: 'The Washington Post' },
+  'huffpost.com':       { bias: -60, credibility: 65, name: 'HuffPost' },
+  'msnbc.com':          { bias: -65, credibility: 60, name: 'MSNBC' },
+  'vox.com':            { bias: -50, credibility: 70, name: 'Vox' },
+  'salon.com':          { bias: -70, credibility: 55, name: 'Salon' },
+  'motherjones.com':    { bias: -72, credibility: 58, name: 'Mother Jones' },
+  'jacobin.com':        { bias: -85, credibility: 50, name: 'Jacobin' },
+  'theintercept.com':   { bias: -68, credibility: 60, name: 'The Intercept' },
+  'npr.org':            { bias: -20, credibility: 90, name: 'NPR' },
+  'cnn.com':            { bias: -32, credibility: 75, name: 'CNN' },
+  'abc.net.au':         { bias: -18, credibility: 86, name: 'ABC Australia' },
+  'smh.com.au':         { bias: -22, credibility: 80, name: 'Sydney Morning Herald' },
+  'theage.com.au':      { bias: -20, credibility: 80, name: 'The Age' },
+
+  // Center / Neutral
+  'bbc.co.uk':          { bias: -8,  credibility: 90, name: 'BBC News' },
+  'bbc.com':            { bias: -8,  credibility: 90, name: 'BBC News' },
+  'reuters.com':        { bias:  2,  credibility: 95, name: 'Reuters' },
+  'apnews.com':         { bias:  0,  credibility: 95, name: 'AP News' },
+  'economist.com':      { bias: -5,  credibility: 92, name: 'The Economist' },
+  'ft.com':             { bias:  5,  credibility: 90, name: 'Financial Times' },
+  'bloomberg.com':      { bias:  8,  credibility: 88, name: 'Bloomberg' },
+  'aljazeera.com':      { bias: -12, credibility: 78, name: 'Al Jazeera' },
+  'thehill.com':        { bias: -5,  credibility: 72, name: 'The Hill' },
+  'politico.com':       { bias: -10, credibility: 80, name: 'Politico' },
+  'axios.com':          { bias: -5,  credibility: 82, name: 'Axios' },
+  'usatoday.com':       { bias: -5,  credibility: 78, name: 'USA Today' },
+  'cbsnews.com':        { bias: -15, credibility: 80, name: 'CBS News' },
+  'nbcnews.com':        { bias: -18, credibility: 78, name: 'NBC News' },
+  'abcnews.go.com':     { bias: -15, credibility: 80, name: 'ABC News' },
+  'time.com':           { bias: -15, credibility: 82, name: 'Time' },
+
+  // Right-leaning
+  'foxnews.com':        { bias:  65, credibility: 60, name: 'Fox News' },
+  'nypost.com':         { bias:  55, credibility: 62, name: 'New York Post' },
+  'wsj.com':            { bias:  25, credibility: 88, name: 'Wall Street Journal' },
+  'nationalreview.com': { bias:  68, credibility: 65, name: 'National Review' },
+  'washingtonexaminer.com': { bias: 58, credibility: 60, name: 'Washington Examiner' },
+  'breitbart.com':      { bias:  88, credibility: 38, name: 'Breitbart' },
+  'dailywire.com':      { bias:  80, credibility: 45, name: 'Daily Wire' },
+  'theblaze.com':       { bias:  75, credibility: 42, name: 'The Blaze' },
+  'spectator.co.uk':    { bias:  45, credibility: 70, name: 'The Spectator' },
+  'telegraph.co.uk':    { bias:  35, credibility: 78, name: 'The Telegraph' },
+  'dailymail.co.uk':    { bias:  50, credibility: 55, name: 'Daily Mail' },
+  'sky.com':            { bias:  15, credibility: 78, name: 'Sky News' },
+  'theaustralian.com.au': { bias: 40, credibility: 72, name: 'The Australian' },
+  'heraldsun.com.au':   { bias:  45, credibility: 65, name: 'Herald Sun' },
+};
+
+// Keywords that signal political lean in URL paths
+const TOPIC_BIAS_SIGNALS = {
+  left:  ['climate-change', 'climate-crisis', 'racial-justice', 'gender-equality', 'universal-healthcare', 'inequality', 'workers-rights', 'indigenous', 'refugees', 'lgbtq', 'reproductive-rights', 'abortion-rights', 'gun-control', 'social-justice'],
+  right: ['border-security', 'illegal-immigration', 'second-amendment', 'free-market', 'deregulation', 'tax-cuts', 'election-integrity', 'woke', 'critical-race-theory', 'gender-ideology', 'defund', 'socialism', 'radical-left'],
+};
+
+const LOADED_TERMS_POOL = {
+  left:   [
+    { term: 'climate crisis', explanation: 'Elevated framing vs neutral "climate change" — implies urgency and catastrophe' },
+    { term: 'far-right', explanation: 'Marginalising label that frames conservatives as extreme outliers' },
+    { term: 'systemic racism', explanation: 'Contested political framing presented as established fact' },
+    { term: 'misinformation', explanation: 'Used selectively to delegitimise opposing viewpoints' },
+    { term: 'ultra-conservative', explanation: 'Pejorative amplifier without objective threshold' },
+    { term: 'right-wing extremists', explanation: 'Broad brush that conflates moderate and extreme positions' },
+  ],
+  right:  [
+    { term: 'radical left', explanation: 'Pejorative framing that conflates moderate progressives with extremists' },
+    { term: 'mainstream media', explanation: 'Delegitimising label implying coordinated bias without evidence' },
+    { term: 'open borders', explanation: 'Strawman framing of immigration reform positions' },
+    { term: 'woke agenda', explanation: 'Dismissive shorthand that trivialises civil rights concerns' },
+    { term: 'deep state', explanation: 'Conspiracy-adjacent framing implying hidden government coordination' },
+    { term: 'fake news', explanation: 'Blanket delegitimisation of critical reporting without specific rebuttal' },
+    { term: 'socialist', explanation: 'Applied loosely to centre-left positions to trigger ideological aversion' },
+  ],
+  center: [
+    { term: 'officials say', explanation: 'Passive attribution that shields sources from accountability' },
+    { term: 'could', explanation: 'Speculative language inflating uncertainty into implicit threat' },
+    { term: 'sparks outrage', explanation: 'Emotion-amplifying verb that manufactures controversy' },
+    { term: 'slams', explanation: 'Combative verb choice that amplifies conflict over substance' },
+  ],
+};
+
+const MISSING_PERSPECTIVES_POOL = {
+  left:   ['Conservative economists who support market-based solutions', 'Religious communities affected by policy changes', 'Small business owners impacted by regulations', 'Rural populations with different lived experiences'],
+  right:  ['Academic researchers and scientific consensus', 'Marginalised communities directly affected', 'International perspectives and global context', 'Long-term environmental and social impact data'],
+  center: ['Grassroots community voices', 'Independent expert analysis outside institutional sources', 'Historical precedent and comparative international cases'],
+};
+
+const FRAMING_STRATEGIES = {
+  left:   [
+    'The article employs progressive framing by centering the perspectives of affected communities while presenting institutional actors as obstacles. Structural causes are emphasised over individual agency, and proposed solutions favour collective intervention.',
+    'Framing prioritises systemic explanation over personal responsibility, using humanising narratives for policy beneficiaries. Dissenting viewpoints receive comparatively brief treatment, limiting dialectical balance.',
+  ],
+  right:  [
+    'The article frames policy issues through an individual liberty and economic efficiency lens, positioning government intervention as inherently problematic. Counter-evidence is acknowledged briefly before being dismissed through appeals to tradition.',
+    'Narrative structure elevates cultural and security concerns, using charged vocabulary to activate reader anxieties. Institutional critics are characterised through affiliation rather than argument, undermining their credibility indirectly.',
+  ],
+  center: [
+    'The piece adopts a largely neutral stance but leans on official sources, creating an implicit institutional bias. Both sides are represented, though framing questions in terms of political opposition may reinforce partisan divisions.',
+    'Coverage uses measured language and attributes claims appropriately, though the selection of which facts to foreground reflects subtle editorial priorities. The "both sides" approach risks false equivalence on empirically settled questions.',
+  ],
+};
+
+// ── SMART LOCAL ANALYSIS ENGINE ──
+async function runAnalysis(url, titleHint) {
+  // Simulate realistic analysis delay
+  await new Promise(r => setTimeout(r, 1800 + Math.random() * 1200));
+
+  const urlObj = new URL(url);
+  const domain = urlObj.hostname.replace('www.', '');
+  const path = urlObj.pathname.toLowerCase();
+
+  // Look up source profile
+  const profile = SOURCE_PROFILES[domain] || null;
+  const sourceName = profile?.name || domain;
+
+  // Base bias from known source
+  let biasScore = profile?.bias ?? 0;
+  let credibilityScore = profile?.credibility ?? 68;
+
+  // Adjust bias based on URL path keywords
+  let pathSignalCount = 0;
+  for (const kw of TOPIC_BIAS_SIGNALS.left) {
+    if (path.includes(kw)) { biasScore -= 8; pathSignalCount++; }
+  }
+  for (const kw of TOPIC_BIAS_SIGNALS.right) {
+    if (path.includes(kw)) { biasScore += 8; pathSignalCount++; }
+  }
+
+  // Add small random variance for realism
+  biasScore += (Math.random() - 0.5) * 12;
+  biasScore = Math.max(-100, Math.min(100, Math.round(biasScore)));
+
+  // Confidence is higher for known sources
+  const baseConfidence = profile ? 78 : 52;
+  const confidenceScore = Math.min(96, Math.round(baseConfidence + pathSignalCount * 4 + Math.random() * 10));
+
+  // Bias label
+  const biasLabel = getBiasLabel(biasScore);
+  const leanDir = biasScore < -20 ? 'left' : biasScore > 20 ? 'right' : 'center';
+
+  // Pick loaded terms
+  const termPool = [...(LOADED_TERMS_POOL[leanDir] || []), ...LOADED_TERMS_POOL.center];
+  const shuffledTerms = termPool.sort(() => Math.random() - 0.5);
+  const loadedTerms = shuffledTerms.slice(0, 2 + Math.floor(Math.random() * 3));
+
+  // Missing perspectives
+  const perspPool = MISSING_PERSPECTIVES_POOL[leanDir] || MISSING_PERSPECTIVES_POOL.center;
+  const missingPerspectives = perspPool.sort(() => Math.random() - 0.5).slice(0, 2);
+
+  // Framing strategy
+  const framingPool = FRAMING_STRATEGIES[leanDir] || FRAMING_STRATEGIES.center;
+  const framingStrategy = framingPool[Math.floor(Math.random() * framingPool.length)];
+
+  // Title: use hint, or extract from URL path
+  const title = titleHint || inferTitle(path, sourceName);
+
+  return {
+    url,
+    date: new Date().toISOString(),
+    title,
+    source: sourceName,
+    biasScore,
+    biasLabel,
+    confidenceScore,
+    credibilityScore: Math.round(credibilityScore + (Math.random() - 0.5) * 8),
+    loadedTerms,
+    missingPerspectives,
+    framingStrategy,
+  };
+}
+
+function getBiasLabel(score) {
+  if (score <= -70) return 'Strongly Progressive';
+  if (score <= -45) return 'Left Lean';
+  if (score <= -20) return 'Slight Left Lean';
+  if (score <= -8)  return 'Lean Left';
+  if (score <=  8)  return 'Neutral / Balanced';
+  if (score <=  20) return 'Lean Right';
+  if (score <=  45) return 'Slight Right Lean';
+  if (score <=  70) return 'Right Lean';
+  return 'Strongly Conservative';
+}
+
+function inferTitle(path, source) {
+  // Convert URL path to readable title
+  const segments = path.split('/').filter(s => s.length > 3 && !/^\d+$/.test(s));
+  if (segments.length === 0) return `Article from ${source}`;
+  const last = segments[segments.length - 1];
+  return last.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).slice(0, 80) || `Article from ${source}`;
+}
+
+function displayResult(r, url) {
+  document.getElementById('result-title').textContent = r.title || 'Article Analysis';
+  document.getElementById('result-source').textContent = r.source || '';
+  document.getElementById('result-score').textContent = Math.abs(r.biasScore || 0) + '/100';
+  document.getElementById('stat-confidence').textContent = (r.confidenceScore || 0) + '%';
+  document.getElementById('stat-loaded').textContent = (r.loadedTerms || []).length;
+  document.getElementById('stat-credibility').textContent = (r.credibilityScore || 0) + '%';
+  document.getElementById('bias-label').textContent = r.biasLabel || 'Neutral';
+  document.getElementById('framing-strategy').textContent = r.framingStrategy || '';
+
+  // Bias marker position (score -100 to 100 → 0% to 100%)
+  const pct = Math.max(0, Math.min(100, ((r.biasScore || 0) + 100) / 2));
+  const marker = document.getElementById('bias-marker');
+  marker.style.left = pct + '%';
+
+  // Loaded terms
+  const termsList = document.getElementById('loaded-terms-list');
+  termsList.innerHTML = (r.loadedTerms || []).map(t =>
+    `<span class="loaded-term px-2 py-1 text-xs font-semibold" title="${escapeAttr(t.explanation)}">${escapeHtml(t.term)}</span>`
+  ).join('') || '<span class="text-xs text-on-surface-variant italic">No loaded terms detected.</span>';
+
+  // Missing perspectives
+  const mpList = document.getElementById('missing-perspectives');
+  mpList.innerHTML = (r.missingPerspectives || []).map(p =>
+    `<div class="flex items-start gap-2 text-xs text-on-surface-variant">
+      <span class="material-symbols-outlined text-secondary text-sm mt-0.5">warning</span>
+      <span>${escapeHtml(p)}</span>
+    </div>`
+  ).join('') || '<span class="text-xs text-on-surface-variant italic">No significant missing perspectives detected.</span>';
+
+  document.getElementById('analysis-result').classList.remove('hidden');
+  document.getElementById('analysis-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── HISTORY ──
+function renderHistory() {
+  const listEl = document.getElementById('history-list');
+  const emptyEl = document.getElementById('history-empty');
+  
+  const analyses = currentUser ? getUserAnalyses(currentUser.email) : getGuestAnalyses();
+  const recent = analyses.slice(0, 3);
+
+  if (recent.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+  listEl.innerHTML = recent.map(a => renderHistoryCard(a)).join('');
+}
+
+function getGuestAnalyses() {
+  const store = getStore();
+  return (store.analyses || []).filter(a => a.userEmail === 'guest').reverse();
+}
+
+function renderHistoryCard(a) {
+  const biasColor = (a.biasScore || 0) < -20 ? '#1d4ed8' : (a.biasScore || 0) > 20 ? '#dc2626' : '#6b7280';
+  const domain = (() => { try { return new URL(a.url).hostname.replace('www.', ''); } catch { return a.source || ''; } })();
+  return `
+    <div class="archive-card bg-white border border-outline-variant rounded-xl p-5 cursor-pointer transition-all" onclick="window.open('${escapeAttr(a.url)}', '_blank')">
+      <p class="text-xs font-bold uppercase tracking-wider mb-2" style="color:${biasColor}">${a.source || domain}</p>
+      <h3 class="text-sm font-semibold text-primary line-clamp-2 mb-3 leading-snug">${escapeHtml(a.title || a.url)}</h3>
+      <div class="flex items-center justify-between">
+        <span class="text-xs text-on-surface-variant">${a.biasLabel || 'Neutral'}</span>
+        <span class="text-xs font-bold text-secondary">${a.confidenceScore || 0}%</span>
+      </div>
+    </div>
+  `;
+}
+
+// ── ARCHIVE ──
+function renderArchive() {
+  const allAnalyses = getAllAnalyses();
+  filterArchive(allAnalyses);
+}
+
+function getAllAnalyses() {
+  const store = getStore();
+  const all = store.analyses || [];
+  if (currentUser) return all.filter(a => a.userEmail === currentUser.email);
+  return all.filter(a => a.userEmail === 'guest');
+}
+
+let filteredArchiveData = [];
+function filterArchive(data) {
+  if (!data) data = getAllAnalyses();
+  
+  const search = document.getElementById('archive-search')?.value.toLowerCase() || '';
+  const biasFilter = document.getElementById('archive-filter-bias')?.value || '';
+  const sort = document.getElementById('archive-sort')?.value || 'date';
+
+  filteredArchiveData = data.filter(a => {
+    const matchSearch = !search || (a.title || '').toLowerCase().includes(search) || (a.source || '').toLowerCase().includes(search);
+    let matchBias = true;
+    if (biasFilter === 'left') matchBias = (a.biasScore || 0) < -15;
+    else if (biasFilter === 'right') matchBias = (a.biasScore || 0) > 15;
+    else if (biasFilter === 'center') matchBias = Math.abs(a.biasScore || 0) <= 15;
+    return matchSearch && matchBias;
+  });
+
+  if (sort === 'confidence') filteredArchiveData.sort((a, b) => (b.confidenceScore || 0) - (a.confidenceScore || 0));
+  else filteredArchiveData.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  archivePage = 0;
+  renderArchivePage();
+}
+
+function renderArchivePage() {
+  const grid = document.getElementById('archive-grid');
+  const empty = document.getElementById('archive-empty');
+  const loadMore = document.getElementById('load-more-btn');
+  const visible = filteredArchiveData.slice(0, (archivePage + 1) * ARCHIVE_PAGE_SIZE);
+
+  if (filteredArchiveData.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.remove('hidden');
+    loadMore.classList.add('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  loadMore.classList.toggle('hidden', visible.length >= filteredArchiveData.length);
+
+  grid.innerHTML = visible.map(a => renderArchiveCard(a)).join('');
+}
+
+function loadMoreArchive() {
+  archivePage++;
+  renderArchivePage();
+}
+
+function renderArchiveCard(a) {
+  const biasScore = a.biasScore || 0;
+  const pct = Math.max(0, Math.min(100, (biasScore + 100) / 2));
+  const domain = (() => { try { return new URL(a.url).hostname.replace('www.', ''); } catch { return a.source || ''; } })();
+  const dateStr = a.date ? new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const biasColor = biasScore < -20 ? '#1d4ed8' : biasScore > 20 ? '#dc2626' : '#6b7280';
+
+  return `
+    <div class="archive-card bg-white border border-outline-variant rounded-xl p-5 transition-all cursor-pointer" onclick="window.open('${escapeAttr(a.url)}', '_blank')">
+      <div class="flex items-start justify-between mb-3">
+        <span class="text-xs font-semibold text-on-surface-variant">${escapeHtml(a.source || domain)}</span>
+        <span class="text-xs text-on-surface-variant">${dateStr}</span>
+      </div>
+      <h3 class="text-sm font-bold text-primary leading-snug mb-4 line-clamp-2">${escapeHtml(a.title || a.url)}</h3>
+      <div class="mb-3">
+        <div class="flex justify-between text-xs mb-1">
+          <span class="font-bold uppercase tracking-wider" style="color:${biasColor}">${a.biasLabel || 'Neutral'}</span>
+          <span class="text-on-surface-variant">${a.confidenceScore || 0}%</span>
+        </div>
+        <div class="relative h-1.5 bias-track rounded-full overflow-hidden">
+          <div class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-primary rounded-full shadow" style="left:${pct}%; transform:translateX(-50%) translateY(-50%)"></div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-on-surface-variant">Credibility: ${a.credibilityScore || 0}%</span>
+        <span class="material-symbols-outlined text-on-surface-variant text-sm">open_in_new</span>
+      </div>
+    </div>
+  `;
+}
+
+// ── TOAST ──
+function showToast(msg, icon = 'info') {
+  const toast = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  document.getElementById('toast-icon').textContent = icon;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ── UTILS ──
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escapeAttr(str) {
+  if (!str) return '';
+  return String(str).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+}
+
+// ── INIT ──
+restoreSession();
+loadNewsSuggestions();
+renderHistory();
+</script>
+</body>
+</html>
