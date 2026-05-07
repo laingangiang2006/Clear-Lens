@@ -15,7 +15,7 @@ ClearLens is a high-fidelity media literacy tool built for **Next Byte Hacks V2*
 - **Per-User Data Persistence:** All analyses are saved to `localStorage` per user account. Guest analyses are stored separately. Sessions persist across page reloads.
 
 ## Technical Implementation
-ClearLens is a single-file application (`clearlens.html`) built with **Vanilla HTML, CSS, and JavaScript**, styled with **Tailwind CSS**.
+ClearLens is a single-file application (`index.html`) built with **Vanilla HTML, CSS, and JavaScript**, styled with **Tailwind CSS**.
 
 ### Analysis Engine
 The bias engine operates entirely client-side with no external API dependencies:
@@ -41,7 +41,7 @@ Falls back gracefully to a curated static pool if feeds are unavailable.
 
 ### Local Setup
 1. Clone this repository.
-2. Open `clearlens.html` in any modern web browser.
+2. Open `index.html` in any modern web browser.
 3. No API key or build step required — the app runs entirely in the browser.
 
 ## Design System
