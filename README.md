@@ -53,13 +53,9 @@ Falls back gracefully to a curated static pool if feeds are unavailable.
 - **Components:** Cards with `rounded-xl`, bias spectrum gradient bar, uppercase label-sm tracking, amber focus states on inputs.
 
 ## Pages
-- **Analysis** — URL input, live analysis result panel, news suggestions, and recent history.
-- **Archive** — Full searchable and filterable grid of all past analyses.
-- **Methodology** — Explainer covering linguistic deviation, systemic bias detection, framing analysis, and the three-stage processing pipeline.
-- **About** — Manifesto, mission statement, feature pillars, team section, and CTA.
-- **Sign In** — Email/password login with a Google sign-in option.
-- **Sign Up** — Account creation with a split branding and form layout.
-
-## Project Status
-Developed for **Next Byte Hacks V2**.
-**Deadline:** May 31, 2026.
+- **Analysis:** URL input, live analysis result panel, news suggestions, and recent history.
+- **Archive:** Full searchable and filterable grid of all past analyses.
+- **Methodology:** Explainer covering linguistic deviation, systemic bias detection, framing analysis, and the three-stage processing pipeline.
+- **About:** Manifesto, mission statement, feature pillars, team section, and CTA.
+- **Sign In:** Email/password login with a Google sign-in option.
+- **Sign Up:** Account creation with a split branding and form layout.
