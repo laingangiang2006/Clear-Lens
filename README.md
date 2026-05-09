@@ -1,7 +1,7 @@
 # Clear Lens — News Bias Detector
 
 ## Project Overview
-Clear Lens is a high-fidelity media literacy tool built for **Next Byte Hacks V2**. It empowers readers to "see past the spin" by identifying political framing, loaded language, and missing perspectives in news articles through real-time URL analysis.
+Clear Lens is a high-fidelity media literacy tool. It empowers readers to "see past the spin" by identifying political framing, loaded language, and missing perspectives in news articles through real-time URL analysis.
 
 You can watch the demonstration [here](https://youtu.be/VE1ajG01WN0?si=wjKmWEY5bnWqusVv).
 
